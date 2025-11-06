@@ -1,131 +1,101 @@
-if (typeof (SiebelAppFacade.TMOBillingProfilesTogglePM) === "undefined") {
-  SiebelJS.Namespace("SiebelAppFacade.TMOBillingProfilesTogglePM");
+if (typeof(SiebelAppFacade.TMOContactViewPM) === "undefined") {
+  SiebelJS.Namespace("SiebelAppFacade.TMOContactViewPM");
 
-  define("siebel/custom/TMOBillingProfilesTogglePM", ["siebel/pmodel"], function () {
+  define("siebel/custom/TMOContactViewPM", ["siebel/viewpm"], function () {
 
-    SiebelAppFacade.TMOBillingProfilesTogglePM = (function () {
+    SiebelAppFacade.TMOContactViewPM = (function () {
 
-      function TMOBillingProfilesTogglePM(pm) {
-        SiebelAppFacade.TMOBillingProfilesTogglePM.superclass.constructor.apply(this, arguments);
+      function TMOContactViewPM(pm) {
+        SiebelAppFacade.TMOContactViewPM.superclass.constructor.apply(this, arguments);
       }
 
-      SiebelJS.Extend(TMOBillingProfilesTogglePM, SiebelAppFacade.PresentationModel);
+      SiebelJS.Extend(TMOContactViewPM, SiebelAppFacade.ViewPM);
 
-      TMOBillingProfilesTogglePM.prototype.Init = function () {
-        SiebelAppFacade.TMOBillingProfilesTogglePM.superclass.Init.apply(this, arguments);
+      TMOContactViewPM.prototype.Init = function () {
+        SiebelAppFacade.TMOContactViewPM.superclass.Init.apply(this, arguments);
+        this.SetProperty("ShowVBC", false);
+
+        var view = this.Get("GetView");
+        var contactAppletPM = view.GetAppletMap()["TMO Contact Applet"].GetPModel();
+
         var self = this;
+        contactAppletPM.AttachEventHandler("ShowSelection", function () {
+          self.UpdateToggleState();
+          self.ExecuteMethod("Refresh");
+        });
 
-        // Właściwość, którą PR będzie czytać
-        this.SetProperty("HasProfile", false);
+        // inicjalizacja
+        this.UpdateToggleState();
+      };
 
-        // Zainicjuj i zarejestruj handler zmian rekordu
+      TMOContactViewPM.prototype.UpdateToggleState = function () {
         try {
-          var bc = this.Get("GetBusComp");
-          if (bc) {
-            // Aktualne ustawienie
-            this.UpdateHasProfile(bc);
-
-            // React to record change / show selection
-            // Use framework hook: ShowSelection (sa wywoływane przez applet)
-            this.AddMethod("ShowSelection", function () {
-              self.UpdateHasProfile(bc);
-              // powiadom PR/renderer
-              self.ExecuteMethod("Refresh");
-            }, { sequence: false, scope: this });
-          }
+          var view = this.Get("GetView");
+          var contactPM = view.GetAppletMap()["TMO Contact Applet"].GetPModel();
+          var val = contactPM.ExecuteMethod("GetFieldValue", "TMO Profile Id");
+          this.SetProperty("ShowVBC", !!val && val !== "");
         } catch (e) {
-          SiebelJS.Log("TMOBillingProfilesTogglePM.Init error: " + e.toString());
+          console.warn("UpdateToggleState error:", e);
         }
       };
 
-      TMOBillingProfilesTogglePM.prototype.UpdateHasProfile = function (bc) {
-        try {
-          if (!bc) return;
-          var val = bc.GetFieldValue("TMO Profile Id");
-          this.SetProperty("HasProfile", !!val && val !== "");
-        } catch (e) {
-          SiebelJS.Log("TMOBillingProfilesTogglePM.UpdateHasProfile error: " + e.toString());
-        }
-      };
-
-      return TMOBillingProfilesTogglePM;
+      return TMOContactViewPM;
     })();
 
-    return "SiebelAppFacade.TMOBillingProfilesTogglePM";
+    return "SiebelAppFacade.TMOContactViewPM";
   });
 }
 
 
-if (typeof (SiebelAppFacade.TMOBillingProfilesTogglePR) === "undefined") {
-  SiebelJS.Namespace("SiebelAppFacade.TMOBillingProfilesTogglePR");
+if (typeof(SiebelAppFacade.TMOContactViewPR) === "undefined") {
+  SiebelJS.Namespace("SiebelAppFacade.TMOContactViewPR");
 
-  define("siebel/custom/TMOBillingProfilesTogglePR", ["siebel/phyrenderer"], function () {
+  define("siebel/custom/TMOContactViewPR", ["siebel/phyrenderer"], function () {
 
-    SiebelAppFacade.TMOBillingProfilesTogglePR = (function () {
+    SiebelAppFacade.TMOContactViewPR = (function () {
 
-      function TMOBillingProfilesTogglePR(pm) {
-        SiebelAppFacade.TMOBillingProfilesTogglePR.superclass.constructor.apply(this, arguments);
+      function TMOContactViewPR(pm) {
+        SiebelAppFacade.TMOContactViewPR.superclass.constructor.apply(this, arguments);
       }
 
-      SiebelJS.Extend(TMOBillingProfilesTogglePR, SiebelAppFacade.PhysicalRenderer);
+      SiebelJS.Extend(TMOContactViewPR, SiebelAppFacade.PhysicalRenderer);
 
-      TMOBillingProfilesTogglePR.prototype.BindData = function () {
-        try {
-          SiebelAppFacade.TMOBillingProfilesTogglePR.superclass.BindData.apply(this, arguments);
-          this.ToggleApplets();
-        } catch (e) {
-          SiebelJS.Log("TMOBillingProfilesTogglePR.BindData error: " + e.toString());
+      TMOContactViewPR.prototype.BindData = function () {
+        SiebelAppFacade.TMOContactViewPR.superclass.BindData.apply(this, arguments);
+        this.ToggleBillingProfiles();
+      };
+
+      TMOContactViewPR.prototype.BindEvents = function () {
+        SiebelAppFacade.TMOContactViewPR.superclass.BindEvents.apply(this, arguments);
+
+        var self = this;
+        var pm = this.GetPM();
+
+        pm.AttachEventHandler("Refresh", function () {
+          self.ToggleBillingProfiles();
+        });
+      };
+
+      TMOContactViewPR.prototype.ToggleBillingProfiles = function () {
+        var pm = this.GetPM();
+        var view = pm.Get("GetView");
+
+        var showVBC = pm.Get("ShowVBC");
+        var vbcApplet = view.GetAppletMap()["TMO Billing Profiles VBC Applet"];
+        var bcApplet  = view.GetAppletMap()["TMO Billing Profiles BC Applet"];
+
+        if (showVBC) {
+          SiebelApp.S_App.ShowApplet(vbcApplet.GetName(), true);
+          SiebelApp.S_App.ShowApplet(bcApplet.GetName(), false);
+        } else {
+          SiebelApp.S_App.ShowApplet(vbcApplet.GetName(), false);
+          SiebelApp.S_App.ShowApplet(bcApplet.GetName(), true);
         }
       };
 
-      TMOBillingProfilesTogglePR.prototype.BindEvents = function () {
-        try {
-          SiebelAppFacade.TMOBillingProfilesTogglePR.superclass.BindEvents.apply(this, arguments);
-          var self = this;
-          var pm = this.GetPM();
-          // Listen to "Refresh" method triggered by PM
-          pm.AttachEventHandler("Refresh", function () {
-            self.ToggleApplets();
-          });
-        } catch (e) {
-          SiebelJS.Log("TMOBillingProfilesTogglePR.BindEvents error: " + e.toString());
-        }
-      };
-
-      TMOBillingProfilesTogglePR.prototype.ToggleApplets = function () {
-        try {
-          var pm = this.GetPM();
-          var hasProfile = false;
-          try { hasProfile = !!pm.Get("HasProfile"); } catch (e) { hasProfile = false; }
-
-          var view = SiebelApp.S_App.GetActiveView();
-          if (!view) return;
-
-          // Dopasuj nazwy appletów do swoich
-          var bcApplet = view.GetApplet("TMO Billing Profiles Applet");
-          var vbcApplet = view.GetApplet("TMO VBC Billing Profiles Applet");
-
-          // If applets not present, nothing to do
-          if (!bcApplet && !vbcApplet) return;
-
-          // Ustaw Visible property na PM docelowych appletów (bez dotykania DOM)
-          try {
-            if (bcApplet && bcApplet.GetPM()) bcApplet.GetPM().SetProperty("Visible", hasProfile ? false : true);
-          } catch (e) { SiebelJS.Log("Error setting BC applet Visible: " + e.toString()); }
-
-          try {
-            if (vbcApplet && vbcApplet.GetPM()) vbcApplet.GetPM().SetProperty("Visible", hasProfile ? true : false);
-          } catch (e) { SiebelJS.Log("Error setting VBC applet Visible: " + e.toString()); }
-
-        } catch (e) {
-          SiebelJS.Log("TMOBillingProfilesTogglePR.ToggleApplets error: " + e.toString());
-        }
-      };
-
-      return TMOBillingProfilesTogglePR;
+      return TMOContactViewPR;
     })();
 
-    return "SiebelAppFacade.TMOBillingProfilesTogglePR";
+    return "SiebelAppFacade.TMOContactViewPR";
   });
 }
-
