@@ -1,0 +1,93 @@
+if (typeof (SiebelAppFacade.TMOBillingProfilesTogglePM) === "undefined") {
+  SiebelJS.Namespace("SiebelAppFacade.TMOBillingProfilesTogglePM");
+
+  define("siebel/custom/TMOBillingProfilesTogglePM", ["siebel/pmodel"], function () {
+
+    SiebelAppFacade.TMOBillingProfilesTogglePM = (function () {
+
+      function TMOBillingProfilesTogglePM(pm) {
+        SiebelAppFacade.TMOBillingProfilesTogglePM.superclass.constructor.apply(this, arguments);
+      }
+
+      SiebelJS.Extend(TMOBillingProfilesTogglePM, SiebelAppFacade.PresentationModel);
+
+      TMOBillingProfilesTogglePM.prototype.Init = function () {
+        SiebelAppFacade.TMOBillingProfilesTogglePM.superclass.Init.apply(this, arguments);
+
+        var bc = this.Get("GetBusComp");
+        this.SetProperty("HasProfile", false);
+
+        this.UpdateHasProfile(bc);
+
+        var self = this;
+        bc.AddProperty("TMOProfileListener", "");
+        bc.AttachEventHandler("OnRecordChange", function () {
+          self.UpdateHasProfile(bc);
+          self.ExecuteMethod("Refresh");
+        });
+      };
+
+      TMOBillingProfilesTogglePM.prototype.UpdateHasProfile = function (bc) {
+        var val = bc.GetFieldValue("TMO Profile Id");
+        this.SetProperty("HasProfile", !!val && val !== "");
+      };
+
+      return TMOBillingProfilesTogglePM;
+    })();
+
+    return "SiebelAppFacade.TMOBillingProfilesTogglePM";
+  });
+}
+
+
+
+if (typeof (SiebelAppFacade.TMOBillingProfilesTogglePR) === "undefined") {
+  SiebelJS.Namespace("SiebelAppFacade.TMOBillingProfilesTogglePR");
+
+  define("siebel/custom/TMOBillingProfilesTogglePR", ["siebel/phyrenderer"], function () {
+
+    SiebelAppFacade.TMOBillingProfilesTogglePR = (function () {
+
+      function TMOBillingProfilesTogglePR(pm) {
+        SiebelAppFacade.TMOBillingProfilesTogglePR.superclass.constructor.apply(this, arguments);
+      }
+
+      SiebelJS.Extend(TMOBillingProfilesTogglePR, SiebelAppFacade.PhysicalRenderer);
+
+      TMOBillingProfilesTogglePR.prototype.BindData = function () {
+        SiebelAppFacade.TMOBillingProfilesTogglePR.superclass.BindData.apply(this, arguments);
+        this.ToggleApplets();
+      };
+
+      TMOBillingProfilesTogglePR.prototype.BindEvents = function () {
+        SiebelAppFacade.TMOBillingProfilesTogglePR.superclass.BindEvents.apply(this, arguments);
+        var pm = this.GetPM();
+        var self = this;
+        pm.AttachEventHandler("Refresh", function () {
+          self.ToggleApplets();
+        });
+      };
+
+      TMOBillingProfilesTogglePR.prototype.ToggleApplets = function () {
+        var pm = this.GetPM();
+        var showVBC = pm.Get("HasProfile");
+
+        var bcApplet = $("#s_1_1_9_0_Applet");
+        var vbcApplet = $("#s_1_1_10_0_Applet");
+
+        if (showVBC) {
+          bcApplet.hide();
+          vbcApplet.show();
+        } else {
+          vbcApplet.hide();
+          bcApplet.show();
+        }
+      };
+
+      return TMOBillingProfilesTogglePR;
+    })();
+
+    return "SiebelAppFacade.TMOBillingProfilesTogglePR";
+  });
+}
+
