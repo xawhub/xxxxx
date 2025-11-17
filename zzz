@@ -1,101 +1,164 @@
-if (typeof(SiebelAppFacade.TMOContactViewPM) === "undefined") {
-  SiebelJS.Namespace("SiebelAppFacade.TMOContactViewPM");
+if (typeof(SiebelAppFacade.ContactListAppletPM) === "undefined") {
 
-  define("siebel/custom/TMOContactViewPM", ["siebel/viewpm"], function () {
+    SiebelJS.Namespace("SiebelAppFacade.ContactListAppletPM");
 
-    SiebelAppFacade.TMOContactViewPM = (function () {
+    define("siebel/custom/ContactListAppletPM", ["siebel/pmodel"],
+        function (PM) {
 
-      function TMOContactViewPM(pm) {
-        SiebelAppFacade.TMOContactViewPM.superclass.constructor.apply(this, arguments);
-      }
+            SiebelAppFacade.ContactListAppletPM = (function () {
 
-      SiebelJS.Extend(TMOContactViewPM, SiebelAppFacade.ViewPM);
+                function CustomPM() {
+                    PM.call(this);
+                }
+                SiebelJS.Extend(CustomPM, PM);
 
-      TMOContactViewPM.prototype.Init = function () {
-        SiebelAppFacade.TMOContactViewPM.superclass.Init.apply(this, arguments);
-        this.SetProperty("ShowVBC", false);
+                CustomPM.prototype.Init = function () {
+                    PM.prototype.Init.apply(this, arguments);
 
-        var view = this.Get("GetView");
-        var contactAppletPM = view.GetAppletMap()["TMO Contact Applet"].GetPModel();
+                    var bc = this.Get("GetBusComp");
+                    var self = this;
 
-        var self = this;
-        contactAppletPM.AttachEventHandler("ShowSelection", function () {
-          self.UpdateToggleState();
-          self.ExecuteMethod("Refresh");
+                    // event przy KAŻDEJ zmianie zaznaczonego rekordu w list applet
+                    bc.AttachNotificationHandler(
+                        "SelectionChange",
+                        function () {
+                            var profileId = bc.GetFieldValue("Profile Id");
+
+                            SiebelApp.EventManager.fireEvent(
+                                "BP_PROFILE_VISIBILITY",
+                                { profileId: profileId }
+                            );
+                        }
+                    );
+                };
+
+                return CustomPM;
+            }());
+
+            return "SiebelAppFacade.ContactListAppletPM";
         });
-
-        // inicjalizacja
-        this.UpdateToggleState();
-      };
-
-      TMOContactViewPM.prototype.UpdateToggleState = function () {
-        try {
-          var view = this.Get("GetView");
-          var contactPM = view.GetAppletMap()["TMO Contact Applet"].GetPModel();
-          var val = contactPM.ExecuteMethod("GetFieldValue", "TMO Profile Id");
-          this.SetProperty("ShowVBC", !!val && val !== "");
-        } catch (e) {
-          console.warn("UpdateToggleState error:", e);
-        }
-      };
-
-      return TMOContactViewPM;
-    })();
-
-    return "SiebelAppFacade.TMOContactViewPM";
-  });
 }
 
+if (typeof(SiebelAppFacade.BPAccessPR) === "undefined") {
 
-if (typeof(SiebelAppFacade.TMOContactViewPR) === "undefined") {
-  SiebelJS.Namespace("SiebelAppFacade.TMOContactViewPR");
+    SiebelJS.Namespace("SiebelAppFacade.BPAccessPR");
 
-  define("siebel/custom/TMOContactViewPR", ["siebel/phyrenderer"], function () {
+    define("siebel/custom/BPAccess_PR", ["siebel/phyrenderer"],
+        function (PR) {
 
-    SiebelAppFacade.TMOContactViewPR = (function () {
+            SiebelAppFacade.BPAccessPR = (function () {
 
-      function TMOContactViewPR(pm) {
-        SiebelAppFacade.TMOContactViewPR.superclass.constructor.apply(this, arguments);
-      }
+                function CustomPR() {
+                    PR.call(this);
+                    this._enabled = false;
+                }
+                SiebelJS.Extend(CustomPR, PR);
 
-      SiebelJS.Extend(TMOContactViewPR, SiebelAppFacade.PhysicalRenderer);
+                CustomPR.prototype.Init = function () {
+                    PR.prototype.Init.apply(this, arguments);
 
-      TMOContactViewPR.prototype.BindData = function () {
-        SiebelAppFacade.TMOContactViewPR.superclass.BindData.apply(this, arguments);
-        this.ToggleBillingProfiles();
-      };
+                    var self = this;
 
-      TMOContactViewPR.prototype.BindEvents = function () {
-        SiebelAppFacade.TMOContactViewPR.superclass.BindEvents.apply(this, arguments);
+                    SiebelApp.EventManager.addListner(
+                        "BP_PROFILE_VISIBILITY",
+                        function (args) {
+                            self._enabled = (args.profileId === "");
+                            self.toggle();
+                        }
+                    );
+                };
 
-        var self = this;
-        var pm = this.GetPM();
+                CustomPR.prototype.toggle = function () {
+                    var div = $("#" + this.GetPM().Get("GetFullId"));
 
-        pm.AttachEventHandler("Refresh", function () {
-          self.ToggleBillingProfiles();
+                    if (this._enabled) {
+                        div.show();
+                        this.GetPM().ExecuteMethod("RefreshData"); // BC query
+                    } else {
+                        div.hide();
+                    }
+                };
+
+                CustomPR.prototype.ShowUI = function () {
+                    if (!this._enabled) return;
+                    PR.prototype.ShowUI.apply(this, arguments);
+                };
+
+                CustomPR.prototype.BindData = function () {
+                    if (!this._enabled) return;
+                    PR.prototype.BindData.apply(this, arguments);
+                };
+
+                CustomPR.prototype.BindEvents = function () {
+                    if (!this._enabled) return;
+                    PR.prototype.BindEvents.apply(this, arguments);
+                };
+
+                return CustomPR;
+            }());
+
+            return "SiebelAppFacade.BPAccessPR";
         });
-      };
+}
 
-      TMOContactViewPR.prototype.ToggleBillingProfiles = function () {
-        var pm = this.GetPM();
-        var view = pm.Get("GetView");
+if (typeof(SiebelAppFacade.VBCBPAccessPR) === "undefined") {
 
-        var showVBC = pm.Get("ShowVBC");
-        var vbcApplet = view.GetAppletMap()["TMO Billing Profiles VBC Applet"];
-        var bcApplet  = view.GetAppletMap()["TMO Billing Profiles BC Applet"];
+    SiebelJS.Namespace("SiebelAppFacade.VBCBPAccessPR");
 
-        if (showVBC) {
-          SiebelApp.S_App.ShowApplet(vbcApplet.GetName(), true);
-          SiebelApp.S_App.ShowApplet(bcApplet.GetName(), false);
-        } else {
-          SiebelApp.S_App.ShowApplet(vbcApplet.GetName(), false);
-          SiebelApp.S_App.ShowApplet(bcApplet.GetName(), true);
-        }
-      };
+    define("siebel/custom/VBCBPAccess_PR", ["siebel/phyrenderer"],
+        function (PR) {
 
-      return TMOContactViewPR;
-    })();
+            SiebelAppFacade.VBCBPAccessPR = (function () {
 
-    return "SiebelAppFacade.TMOContactViewPR";
-  });
+                function CustomPR() {
+                    PR.call(this);
+                    this._enabled = false;
+                }
+                SiebelJS.Extend(CustomPR, PR);
+
+                CustomPR.prototype.Init = function () {
+                    PR.prototype.Init.apply(this, arguments);
+
+                    var self = this;
+
+                    SiebelApp.EventManager.addListner(
+                        "BP_PROFILE_VISIBILITY",
+                        function (args) {
+                            self._enabled = (args.profileId !== "");
+                            self.toggle();
+                        }
+                    );
+                };
+
+                CustomPR.prototype.toggle = function () {
+                    var div = $("#" + this.GetPM().Get("GetFullId"));
+
+                    if (this._enabled) {
+                        div.show();
+                        this.GetPM().ExecuteMethod("RefreshData"); // VBC Query tylko teraz
+                    } else {
+                        div.hide();
+                    }
+                };
+
+                CustomPR.prototype.ShowUI = function () {
+                    if (!this._enabled) return;
+                    PR.prototype.ShowUI.apply(this, arguments);
+                };
+
+                CustomPR.prototype.BindData = function () {
+                    if (!this._enabled) return;
+                    PR.prototype.BindData.apply(this, arguments);
+                };
+
+                CustomPR.prototype.BindEvents = function () {
+                    if (!this._enabled) return;
+                    PR.prototype.BindEvents.apply(this, arguments);
+                };
+
+                return CustomPR;
+            }());
+
+            return "SiebelAppFacade.VBCBPAccessPR";
+        });
 }
